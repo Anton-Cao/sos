@@ -21,6 +21,10 @@ OBJ=$(patsubst %,$(ODIR)/%,$(_OBJ))
 CC=gcc
 CFLAGS=-I$(IDIR) -I$(LDIR)
 
+ifeq ($(DEBUG), 1)
+	CFLAGS += -DDEBUG
+endif
+
 sos: $(OBJ)
 	$(CC) -o $@ $^ $(CFLAGS) $(LIBS)
 
