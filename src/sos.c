@@ -3,6 +3,7 @@
 #include <stdlib.h>
 #include <sys/wait.h>
 #include <unistd.h>
+#include <fcntl.h>
 
 #include "ketopt.h"
 
@@ -22,13 +23,13 @@ int main(int argc, char *argv[])
     };
   ketopt_t opt = KETOPT_INIT;
   int c;
-  bool open_browser = false;
+  bool openbrowser = false;
   char *command;
   while ((c = ketopt(&opt, argc, argv, 1, "", longopts)) >= 0) {
     switch(c)
       {
       case OPEN_BROWSER_OPT:
-        open_browser = true;
+        openbrowser = true;
         break;
       case '?':
         fprintf(stderr, "unknown opt: -%c\n", opt.opt);
@@ -48,21 +49,37 @@ int main(int argc, char *argv[])
   command = argv[opt.ind];
 
   int i;
-  int command_stdin[2];
-  int command_stdout[2];
-  int command_stderr[2];
-  pipe(command_stdin);
-  pipe(command_stdout);
-  pipe(command_stderr);
+
+  // O_NOCTTY because we don't want parent process to be controlled by the pseudo-terminal
+  // https://linux.die.net/man/3/posix_openpt
+  // https://stackoverflow.com/questions/4057985/disabling-stdout-buffering-of-a-forked-process
+  // https://pubs.opengroup.org/onlinepubs/009695399/functions/posix_openpt.html
+  int masterpt, minionpt;
+  char *miniondevice;
+  masterpt = posix_openpt(O_RDWR | O_NOCTTY);
+  if (masterpt == -1
+      || grantpt(masterpt) == -1
+      || unlockpt(masterpt) == -1
+      || (miniondevice = ptsname(masterpt)) == NULL) {
+    fprintf(stderr, "error creating pseudo-terminal\n");
+    return -1;
+  }
+  #ifdef DEBUG
+  printf("minion device is %s\n", miniondevice);
+  #endif
+  minionpt = open(miniondevice, O_RDWR | O_NOCTTY);
+
   int pid = fork();
   if (pid == 0) {
     // child process
+    close(masterpt);
     char *token = strtok(command, " ");
     char *argv[MAX_COMMAND_TOKENS];
     i = 0;
     while (token != NULL) {
       if (i >= MAX_COMMAND_TOKENS) {
         fprintf(stderr, "maximum token limit exceeded\n");
+        exit(-1);
       }
       argv[i++] = token;
       token = strtok(NULL, " ");
@@ -74,26 +91,21 @@ int main(int argc, char *argv[])
       printf("arg: %s\n", argv[j]);
     #endif
     close(STDIN_FILENO);
-    dup(command_stdin[0]);
-    close(command_stdin[1]);
+    dup(minionpt);
     close(STDOUT_FILENO);
-    dup(command_stdout[1]);
-    close(command_stdin[0]);
+    dup(minionpt);
     close(STDERR_FILENO);
-    dup(command_stderr[1]);
-    close(command_stderr[0]);
+    dup(minionpt);
     #ifdef DEBUG
     printf("entering the warp zone...\n");  // this will be written to command_stdout
     #endif
     execvp(command, (char * const *) argv);
   } else {
     // parent process
-    printf("running %s (pid=%d)\n", command, pid);
-    close(command_stdin[0]);
-    close(command_stdout[1]);
-    close(command_stderr[1]);
+    close(minionpt);
+    printf("running [%s] with pid=%d\n", command, pid);
     char tmp;
-    while (read(command_stdout[0], &tmp, sizeof(tmp))) {
+    while (read(masterpt, &tmp, sizeof(tmp))) {
       printf("%c", tmp);
     }
     // waitpid(pid, NULL, 0);

@@ -6,6 +6,7 @@ Run `make` to build binary, `make DEBUG=1` to build with debug statements, `make
 
 ## Todo
 - [ ] Create separate threads to handle `stdin`, `stdout`, and `stderr` of command
+  - [ ] Unbuffer `stdout` and `stderr`
 - [ ] Parse `stdout` and `stderr` for error messages
 - [ ] Display StackOverflow link for error messages
 - [ ] Refactor
