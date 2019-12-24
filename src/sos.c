@@ -4,11 +4,14 @@
 #include <sys/wait.h>
 #include <unistd.h>
 #include <fcntl.h>
+#include <regex.h>
+#include <curl/curl.h>
 
 #include "ketopt.h"
 
-#define OPEN_BROWSER_OPT 301
+#define OPEN_BROWSER_OPT 301  // should be larger than max ASCII code
 #define MAX_COMMAND_TOKENS 8
+#define MAX_LINE_LEN 1024
 
 void print_usage()
 {
@@ -48,8 +51,6 @@ int main(int argc, char *argv[])
   }
   command = argv[opt.ind];
 
-  int i;
-
   // O_NOCTTY because we don't want parent process to be controlled by the pseudo-terminal
   // https://linux.die.net/man/3/posix_openpt
   // https://stackoverflow.com/questions/4057985/disabling-stdout-buffering-of-a-forked-process
@@ -75,7 +76,7 @@ int main(int argc, char *argv[])
     close(masterpt);
     char *token = strtok(command, " ");
     char *argv[MAX_COMMAND_TOKENS];
-    i = 0;
+    int i = 0;
     while (token != NULL) {
       if (i >= MAX_COMMAND_TOKENS) {
         fprintf(stderr, "maximum token limit exceeded\n");
@@ -103,12 +104,38 @@ int main(int argc, char *argv[])
   } else {
     // parent process
     close(minionpt);
-    printf("running [%s] with pid=%d\n", command, pid);
-    char tmp;
-    while (read(masterpt, &tmp, sizeof(tmp))) {
-      printf("%c", tmp);
+    printf("(sos) running [%s] with pid=%d\n", command, pid);
+    char c;
+    char buf[MAX_LINE_LEN];
+    char errmsg[MAX_LINE_LEN];
+    char url[MAX_LINE_LEN];
+    int i = 0;
+    CURL *curl = curl_easy_init();
+    while (read(masterpt, &c, sizeof(c))) {
+      if (c == '\n') {
+        buf[i] = 0;  // null-terminate
+        i = 0;  // reset
+        printf("%s\n", buf);
+        regex_t re;
+        regmatch_t rms[2];
+        int status;
+        regcomp(&re, "Error: (.*)$", REG_EXTENDED | REG_ICASE);
+        status = regexec(&re, buf, 2, rms, 0);
+        regfree(&re);
+        if (status == 0) {
+          // match found
+          size_t len = rms[1].rm_eo - rms[1].rm_so;
+          strncpy(errmsg, buf + rms[1].rm_so, len);
+          errmsg[len] = 0;
+          char *query = curl_easy_escape(curl, errmsg, len);
+          snprintf(url, MAX_LINE_LEN, "https://stackoverflow.com/search?q=%s", query);
+          printf("(sos) \033[91m%s\033[0m\n", url);
+          curl_free(query);
+        }
+      } else {
+        buf[i++] = c;
+      }
     }
-    // waitpid(pid, NULL, 0);
     #ifdef DEBUG
     printf("child exited\n");
     #endif

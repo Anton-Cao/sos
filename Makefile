@@ -7,7 +7,7 @@ DEPS=$(patsubst %,$(IDIR)/%,$(_DEPS))
 
 # libraries
 LDIR=./lib
-LIBS=
+LIBS=-lcurl
 
 # source
 SDIR=./src
