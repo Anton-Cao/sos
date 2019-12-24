@@ -26,13 +26,14 @@ int main(int argc, char *argv[])
     };
   ketopt_t opt = KETOPT_INIT;
   int c;
-  bool openbrowser = false;
+  bool open_browser = false;
   char *command;
-  while ((c = ketopt(&opt, argc, argv, 1, "", longopts)) >= 0) {
+  while ((c = ketopt(&opt, argc, argv, 1, "o", longopts)) >= 0) {
     switch(c)
       {
       case OPEN_BROWSER_OPT:
-        openbrowser = true;
+      case 'o':
+        open_browser = true;
         break;
       case '?':
         fprintf(stderr, "unknown opt: -%c\n", opt.opt);
@@ -131,6 +132,14 @@ int main(int argc, char *argv[])
           snprintf(url, MAX_LINE_LEN, "https://stackoverflow.com/search?q=%s", query);
           printf("(sos) \033[91m%s\033[0m\n", url);
           curl_free(query);
+          if (open_browser) {
+            printf("(sos) opening in browser...\n");
+            if (fork() == 0) {
+              // spawn new process to open in browser
+              char *argv[] = {"open", url, NULL};
+              execvp(argv[0], argv);
+            }
+          }
         }
       } else {
         buf[i++] = c;
