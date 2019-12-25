@@ -10,8 +10,9 @@
 #include "ketopt.h"
 
 #define OPEN_BROWSER_OPT 301  // should be larger than max ASCII code
-#define DEFAULT_SOSRC_OPT 302
-#define HELP_OPT 303
+#define SOSRC_FILE_OPT 302
+#define DEFAULT_SOSRC_OPT 303
+#define HELP_OPT 304
 
 #define MAX_COMMAND_TOKENS 8
 #define MAX_LINE_LEN 256
@@ -32,7 +33,8 @@ void print_usage()
   printf("Usage: sos [options] command\n");
   printf("Options:\n");
   printf("  --open-browser (-o): open links automatically in default browser\n");
-  printf("  --default-sosrc (-r): print default ~/.sosrc file\n");
+  printf("  --sosrc-file (-f) <sosrc>: use <sosrc> instead of ~/.sosrc\n");
+  printf("  --default-sosrc: print default ~/.sosrc file\n");
   printf("  --help (-h): display this help text\n");
 }
 
@@ -129,6 +131,7 @@ int main(int argc, char *argv[])
   static ko_longopt_t longopts[] =
     {
      { "open-browser", ko_no_argument, OPEN_BROWSER_OPT },
+     { "sosrc-file", ko_required_argument, SOSRC_FILE_OPT },
      { "default-sosrc", ko_no_argument, DEFAULT_SOSRC_OPT },
      { "help", ko_no_argument, HELP_OPT },
     };
@@ -136,15 +139,20 @@ int main(int argc, char *argv[])
   int c;
   bool open_browser = false;
   char *command;
-  while ((c = ketopt(&opt, argc, argv, 1, "orh", longopts)) >= 0) {
+  char *sosrc_path = NULL;
+  while ((c = ketopt(&opt, argc, argv, 1, "of:h", longopts)) >= 0) {
     switch(c)
       {
       case OPEN_BROWSER_OPT:
       case 'o':
         open_browser = true;
         break;
+      case SOSRC_FILE_OPT:
+      case 'f':
+        sosrc_path = malloc((strlen(opt.arg) + 1) * sizeof(char));
+        strcpy(sosrc_path, opt.arg);
+        break;
       case DEFAULT_SOSRC_OPT:
-      case 'r':
         print_default_sosrc();
         return 0;
       case HELP_OPT:
@@ -162,13 +170,13 @@ int main(int argc, char *argv[])
       }
   }
   if (opt.ind != argc - 1) {
-    fprintf(stderr, "found %d command(s), expected 1\n", argc - opt.ind);
+    fprintf(stderr, "found %d commands, expected 1\n", argc - opt.ind);
     print_usage();
     return -1;
   }
   command = argv[opt.ind];
 
-  if (init_sos(NULL) == -1)
+  if (init_sos(sosrc_path) == -1)
     return -1;
 
   // O_NOCTTY because we don't want parent process to be controlled by the pseudo-terminal
