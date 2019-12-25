@@ -1,6 +1,9 @@
+#include "sos.h"
+
 #include <stdio.h>
 #include <stdbool.h>
 #include <stdlib.h>
+#include <string.h>
 #include <sys/wait.h>
 #include <unistd.h>
 #include <fcntl.h>
@@ -15,18 +18,6 @@
 #define HELP_OPT 304
 
 #define MAX_COMMAND_TOKENS 8
-#define MAX_LINE_LEN 256
-
-static const char *sosrc_file = "/.sosrc";
-
-struct error_filter {
-  char *name;  // name of filter, for debugging purposes only
-  regex_t re;  // regex pattern to match error messages
-  char *tags;  // extra text to include in search
-  struct error_filter *next;  // pointer to next filter in linked list
-};
-
-struct error_filter *error_filters = NULL;
 
 void print_usage()
 {
@@ -43,87 +34,6 @@ void print_default_sosrc()
   printf("- name: Python errors\n");
   printf("  pattern: ^(.*Error: .*)$\n");
   printf("  tags: python\n");
-}
-
-struct error_filter* ErrorFilter_new()
-{
-  struct error_filter *filter = malloc(sizeof(struct error_filter));
-  filter->name = NULL;
-  filter->next = error_filters;
-  error_filters = filter;
-  return filter;
-}
-
-void ErrorFilter_add_line(struct error_filter *filter, char *line)
-{
-  char const *name = "name: ";
-  char const *pattern = "pattern: ";
-  char const *tags = "tags: ";
-  char *start;
-  if (start=strstr(line, name)) {
-    filter->name = malloc(strlen(start) - strlen(name) + 1);
-    strcpy(filter->name, start + strlen(name));
-    #ifdef DEBUG
-    printf("name: %s\n", filter->name);
-    #endif
-  } else if (start=strstr(line, pattern)) {
-    char *restr = malloc(strlen(start) - strlen(pattern) + 1);
-    strcpy(restr, start + strlen(pattern));
-    regcomp(&filter->re, restr, REG_EXTENDED | REG_ICASE);
-#ifdef DEBUG
-    printf("pattern: %s\n", restr);
-#endif
-    free(restr);
-  } else if (start=strstr(line, tags)) {
-    filter->tags = malloc(strlen(start) - strlen(tags) + 1);
-    strcpy(filter->tags, start + strlen(tags));
-#ifdef DEBUG
-    printf("tags: %s\n", filter->tags);
-#endif
-  }
-}
-
-int init_sos(char *sosrc_path)
-{
-  if (!sosrc_path) {
-    if (!getenv("HOME")) {
-      fprintf(stderr, "$HOME not set, cannot find ~/.sosrc\n");
-      return -1;
-    }
-    sosrc_path = malloc(strlen(getenv("HOME")) + strlen(sosrc_file) + 1);
-    strcat(strcpy(sosrc_path, getenv("HOME")), sosrc_file);
-  }
-  int sosrc;
-  if ((sosrc=open(sosrc_path, O_RDONLY)) == -1) {
-    fprintf(stderr, "unable to open %s, check that it exists?\n", sosrc_path);
-    return -1;
-  }
-  char buf[MAX_LINE_LEN];
-  char c;
-  int i = 0;
-  int linenum = 1;
-  struct error_filter *cur_filter;
-  while (read(sosrc, &c, sizeof(c))) {
-    if (c == '\n') {
-      buf[i] = 0;
-      i = 0;
-      linenum++;
-      if (buf[0] == '-')
-        cur_filter = ErrorFilter_new();
-      ErrorFilter_add_line(cur_filter, buf);
-    } else {
-      if (i >= MAX_LINE_LEN) {
-        fprintf(stderr, "maximum line length exceeded on line %d of %s\n", linenum, sosrc_file);
-        return -1;
-      }
-      buf[i++] = c;
-    }
-  }
-  if (!error_filters) {
-    fprintf(stderr, "no error filters found in %s\n", sosrc_path);
-    return -1;
-  }
-  return 0;
 }
 
 int main(int argc, char *argv[])
@@ -176,7 +86,7 @@ int main(int argc, char *argv[])
   }
   command = argv[opt.ind];
 
-  if (init_sos(sosrc_path) == -1)
+  if (ErrorFilter_parse(sosrc_path) == -1)
     return -1;
 
   // O_NOCTTY because we don't want parent process to be controlled by the pseudo-terminal

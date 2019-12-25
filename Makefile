@@ -14,7 +14,7 @@ SDIR=./src
 
 # object files
 ODIR=$(SDIR)/obj
-_OBJ=sos.o
+_OBJ=error_filter.o sos.o
 OBJ=$(patsubst %,$(ODIR)/%,$(_OBJ))
 
 # compilation
