@@ -13,7 +13,7 @@ Run `make` to build binary, `make DEBUG=1` to build with debug statements, `make
 - [x] Refactor
 - [x] Include tags in search
 - [x] Show search query
-- [ ] Support interactive commands like `python` interpreter (need to unbuffer pseudoterminal)
 - [ ] Add examples
 - [ ] Add tests
 - [ ] Distribute somehow
+- [ ] Support interactive commands like `python` interpreter (need to unbuffer pseudoterminal)

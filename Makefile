@@ -36,6 +36,16 @@ $(ODIR):
 
 .PHONY: clean
 
+# installation
+PREFIX=/usr/local/bin
+BINARY=sos
+
+install: sos
+	cp $< $(PREFIX)/$(BINARY)
+
+uninstall:
+	rm $(PREFIX)/$(BINARY)
+
 clean:
-	rm -f $(ODIR)/*.o *~ sos
+	rm -f $(ODIR)/*.o sos
 

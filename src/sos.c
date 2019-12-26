@@ -4,13 +4,10 @@
 #include <stdbool.h>
 #include <stdlib.h>
 #include <string.h>
-#include <sys/wait.h>
 #include <unistd.h>
 #include <fcntl.h>
 #include <regex.h>
 #include <curl/curl.h>
-
-#include "ketopt.h"
 
 #define MAX_COMMAND_TOKENS 8
 
@@ -19,7 +16,7 @@ const char *prompt = "\033[34m(sos)\033[0m";
 void child(struct cmd_opts *cmd_opts, int minionpt)
 {
   char *token = strtok(cmd_opts->command, " ");
-  char *argv[MAX_COMMAND_TOKENS];
+  char *argv[MAX_COMMAND_TOKENS + 1];
   int i = 0;
   while (token != NULL) {
     if (i >= MAX_COMMAND_TOKENS) {
@@ -124,9 +121,9 @@ int main(int argc, char *argv[])
     fprintf(stderr, "error creating pseudo-terminal\n");
     return -1;
   }
-  #ifdef DEBUG
+#ifdef DEBUG
   printf("minion device is %s\n", miniondevice);
-  #endif
+#endif
   minionpt = open(miniondevice, O_RDWR | O_NOCTTY);
 
   int pid = fork();
