@@ -12,81 +12,16 @@
 
 #include "ketopt.h"
 
-#define OPEN_BROWSER_OPT 301  // should be larger than max ASCII code
-#define SOSRC_FILE_OPT 302
-#define DEFAULT_SOSRC_OPT 303
-#define HELP_OPT 304
-
 #define MAX_COMMAND_TOKENS 8
-
-void print_usage()
-{
-  printf("Usage: sos [options] command\n");
-  printf("Options:\n");
-  printf("  --open-browser (-o): open links automatically in default browser\n");
-  printf("  --sosrc-file (-f) <sosrc>: use <sosrc> instead of ~/.sosrc\n");
-  printf("  --default-sosrc: print default ~/.sosrc file\n");
-  printf("  --help (-h): display this help text\n");
-}
-
-void print_default_sosrc()
-{
-  printf("- name: Python errors\n");
-  printf("  pattern: ^(.*Error: .*)$\n");
-  printf("  tags: python\n");
-}
 
 int main(int argc, char *argv[])
 {
-  static ko_longopt_t longopts[] =
-    {
-     { "open-browser", ko_no_argument, OPEN_BROWSER_OPT },
-     { "sosrc-file", ko_required_argument, SOSRC_FILE_OPT },
-     { "default-sosrc", ko_no_argument, DEFAULT_SOSRC_OPT },
-     { "help", ko_no_argument, HELP_OPT },
-    };
-  ketopt_t opt = KETOPT_INIT;
-  int c;
-  bool open_browser = false;
-  char *command;
-  char *sosrc_path = NULL;
-  while ((c = ketopt(&opt, argc, argv, 1, "of:h", longopts)) >= 0) {
-    switch(c)
-      {
-      case OPEN_BROWSER_OPT:
-      case 'o':
-        open_browser = true;
-        break;
-      case SOSRC_FILE_OPT:
-      case 'f':
-        sosrc_path = malloc((strlen(opt.arg) + 1) * sizeof(char));
-        strcpy(sosrc_path, opt.arg);
-        break;
-      case DEFAULT_SOSRC_OPT:
-        print_default_sosrc();
-        return 0;
-      case HELP_OPT:
-      case 'h':
-        print_usage();
-        return 0;
-      case '?':
-        fprintf(stderr, "unknown opt: -%c\n", opt.opt);
-        print_usage();
-        return -1;
-      case ':':
-        fprintf(stderr, "missing arg: -%c\n", opt.opt);
-        print_usage();
-        return -1;
-      }
-  }
-  if (opt.ind != argc - 1) {
-    fprintf(stderr, "found %d commands, expected 1\n", argc - opt.ind);
-    print_usage();
+  struct cmd_opts cmd_opts;
+  if (CmdOpts_parse(&cmd_opts, argc, argv) == -1 ||
+      cmd_opts.command == NULL)
     return -1;
-  }
-  command = argv[opt.ind];
 
-  if (ErrorFilter_parse(sosrc_path) == -1)
+  if (ErrorFilter_parse(cmd_opts.sosrc_path) == -1)
     return -1;
 
   // O_NOCTTY because we don't want parent process to be controlled by the pseudo-terminal
@@ -112,7 +47,7 @@ int main(int argc, char *argv[])
   if (pid == 0) {
     // child process
     close(masterpt);
-    char *token = strtok(command, " ");
+    char *token = strtok(cmd_opts.command, " ");
     char *argv[MAX_COMMAND_TOKENS];
     int i = 0;
     while (token != NULL) {
@@ -138,11 +73,11 @@ int main(int argc, char *argv[])
     #ifdef DEBUG
     printf("entering the warp zone...\n");  // this will be written to command_stdout
     #endif
-    execvp(command, (char * const *) argv);
+    execvp(cmd_opts.command, (char * const *) argv);
   } else {
     // parent process
     close(minionpt);
-    printf("(sos) running [%s] with pid=%d\n", command, pid);
+    printf("(sos) running [%s] with pid=%d\n", cmd_opts.command, pid);
     char c;
     char buf[MAX_LINE_LEN];
     char errmsg[MAX_LINE_LEN];
@@ -168,7 +103,7 @@ int main(int argc, char *argv[])
             snprintf(url, MAX_LINE_LEN, "https://stackoverflow.com/search?q=%s", query);
             printf("(sos) \033[91m%s\033[0m\n", url);
             curl_free(query);
-            if (open_browser) {
+            if (cmd_opts.open_browser) {
               printf("(sos) opening in browser...\n");
               if (fork() == 0) {
                 // spawn new process to open in browser
