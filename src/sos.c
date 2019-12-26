@@ -14,7 +14,7 @@
 
 #define MAX_COMMAND_TOKENS 8
 
-const char *prompt = "(sos)";
+const char *prompt = "\033[34m(sos)\033[0m";
 
 void child(struct cmd_opts *cmd_opts, int minionpt)
 {
@@ -60,32 +60,39 @@ void parent(struct cmd_opts *cmd_opts, int masterpt)
   CURL *curl = curl_easy_init();
 
   while (read(masterpt, &c, sizeof(c))) {
-    if (c == '\n') {
+    if (c == '\n' || c == '\r') {
       buf[i] = 0;
-      i = 0;
-      printf("%s\n", buf);
 
-      filter = error_filters;
-      while (filter) {
-        status = regexec(&filter->re, buf, 2, rms, 0);
-        if (status == 0) {  // match found
-          len = rms[1].rm_eo - rms[1].rm_so;
-          strncpy(err, buf + rms[1].rm_so, len);
-          err[len] = 0;
-          query = curl_easy_escape(curl, err, len);
-          snprintf(url, MAX_LINE_LEN, "https://stackoverflow.com/search?q=%s", query);
-          curl_free(query);
-          printf("%s \033[91m%s\033[0m\n", prompt, url);
-          if (cmd_opts->open_browser) {
-            if (fork() == 0) {  // spawn new process to open in browser
-              char *argv[] = {"open", url, NULL};
-              execvp(argv[0], argv);
+      if (i > 0) {
+        printf("%s\n", buf);
+
+        // traverse linked list
+        filter = error_filters;
+        while (filter) {
+          status = regexec(&filter->re, buf, 2, rms, 0);
+          if (status == 0) {  // match found
+            len = rms[1].rm_eo - rms[1].rm_so;
+            strncpy(err, buf + rms[1].rm_so, len);
+            err[len] = 0;
+            strcat(err, " ");
+            strcat(err, filter->tags);
+            query = curl_easy_escape(curl, err, 0);
+            snprintf(url, MAX_LINE_LEN, "https://stackoverflow.com/search?q=%s", query);
+            curl_free(query);
+            printf("%s \033[31m%s\033[0m (%s)\n", prompt, url, err);
+            if (cmd_opts->open_browser) {
+              if (fork() == 0) {  // spawn new process to open in browser
+                char *argv[] = {"open", url, NULL};
+                execvp(argv[0], argv);
+              }
             }
+            break;
           }
-          break;
+          filter = filter->next;
         }
-        filter = filter->next;
       }
+
+      i = 0;
     } else {
       buf[i++] = c;
     }
