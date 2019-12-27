@@ -34,7 +34,7 @@ $(ODIR)/%.o: $(SDIR)/%.c $(DEPS) | $(ODIR)
 $(ODIR):
 	mkdir -p $@
 
-.PHONY: clean
+.PHONY: clean install uninstall
 
 # installation
 PREFIX=/usr/local/bin
