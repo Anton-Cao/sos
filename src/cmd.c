@@ -8,14 +8,12 @@
 // should be larger than max ASCII code
 #define OPEN_BROWSER_OPT 301
 #define SOSRC_FILE_OPT 302
-#define DEFAULT_SOSRC_OPT 303
-#define HELP_OPT 304
+#define HELP_OPT 303
 
 const ko_longopt_t longopts[] =
   {
    { "open-browser", ko_no_argument, OPEN_BROWSER_OPT },
    { "sosrc-file", ko_required_argument, SOSRC_FILE_OPT },
-   { "default-sosrc", ko_no_argument, DEFAULT_SOSRC_OPT },
    { "help", ko_no_argument, HELP_OPT },
   };
 
@@ -25,15 +23,7 @@ void print_usage()
   printf("Options:\n");
   printf("  --open-browser (-o): open links automatically in default browser\n");
   printf("  --sosrc-file (-f) <sosrc>: use <sosrc> instead of ~/.sosrc\n");
-  printf("  --default-sosrc: print default ~/.sosrc file\n");
   printf("  --help (-h): display this help text\n");
-}
-
-void print_default_sosrc()
-{
-  printf("- name: Python errors\n");
-  printf("  pattern: ^(.*Error: .*)$\n");
-  printf("  tags: python\n");
 }
 
 int CmdOpts_parse(struct cmd_opts *cmd_opts, int argc, char *argv[])
@@ -57,9 +47,6 @@ int CmdOpts_parse(struct cmd_opts *cmd_opts, int argc, char *argv[])
         cmd_opts->sosrc_path = malloc((strlen(opt.arg) + 1) * sizeof(char));
         strcpy(cmd_opts->sosrc_path, opt.arg);
         break;
-      case DEFAULT_SOSRC_OPT:
-        print_default_sosrc();
-        return 0;
       case HELP_OPT:
       case 'h':
         print_usage();

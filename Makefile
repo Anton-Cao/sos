@@ -39,9 +39,11 @@ $(ODIR):
 # installation
 PREFIX=/usr/local/bin
 BINARY=sos
+CONFIG=.sosrc
 
 install: sos
 	cp $< $(PREFIX)/$(BINARY)
+	cp -n $(CONFIG).default $(HOME)/$(CONFIG) || true
 
 uninstall:
 	rm $(PREFIX)/$(BINARY)

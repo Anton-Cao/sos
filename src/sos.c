@@ -67,7 +67,10 @@ void parent(struct cmd_opts *cmd_opts, int masterpt)
         filter = error_filters;
         while (filter) {
           status = regexec(&filter->re, buf, 2, rms, 0);
-          if (status == 0) {  // match found
+          if (status == 0 && rms[1].rm_so != -1) {  // match found
+#ifdef DEBUG
+            printf("matched the filter named: %s\n", filter->name);
+#endif
             len = rms[1].rm_eo - rms[1].rm_so;
             strncpy(err, buf + rms[1].rm_so, len);
             err[len] = 0;
