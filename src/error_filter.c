@@ -26,7 +26,8 @@ struct error_filter* ErrorFilter_new()
 }
 
 // Parse a line of the sosrc file and update the error filter.
-void ErrorFilter_add_line(struct error_filter *filter, char *line)
+// Return -1 on error, 0 on success.
+int ErrorFilter_add_line(struct error_filter *filter, char *line)
 {
   char *start;
   if (start=strstr(line, NAME)) {
@@ -42,6 +43,12 @@ void ErrorFilter_add_line(struct error_filter *filter, char *line)
 #ifdef DEBUG
     printf("pattern: %s\n", restr);
 #endif
+    if (filter->re.re_nsub != 1) {
+      fprintf(stderr,
+              "pattern must have exactly one parenthesized subexpression, found \"%s\"\n", restr);
+      free(restr);
+      return -1;
+    }
     free(restr);
   } else if (start=strstr(line, TAGS)) {
     filter->tags = malloc(strlen(start) - strlen(TAGS) + 1);
@@ -50,6 +57,7 @@ void ErrorFilter_add_line(struct error_filter *filter, char *line)
     printf("tags: %s\n", filter->tags);
 #endif
   }
+  return 0;
 }
 
 // Parse sosrc file to populate error filters linked list.
@@ -88,7 +96,8 @@ int ErrorFilter_parse(char *sosrc_path)
       linenum++;
       if (buf[0] == '-')
         cur_filter = ErrorFilter_new();
-      ErrorFilter_add_line(cur_filter, buf);
+      if (ErrorFilter_add_line(cur_filter, buf) == -1)
+        return -1;
     } else {
       if (i >= MAX_LINE_LEN) {
         fprintf(stderr, "maximum line length exceeded on line %d of %s\n", linenum, SOSRC_FILE);
