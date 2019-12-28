@@ -34,7 +34,10 @@ $(ODIR)/%.o: $(SDIR)/%.c $(DEPS) | $(ODIR)
 $(ODIR):
 	mkdir -p $@
 
-.PHONY: clean install uninstall
+.PHONY: clean install uninstall test
+
+clean:
+	rm -f $(ODIR)/*.o sos
 
 # installation
 PREFIX=/usr/local/bin
@@ -48,6 +51,5 @@ install: sos
 uninstall:
 	rm $(PREFIX)/$(BINARY)
 
-clean:
-	rm -f $(ODIR)/*.o sos
-
+test: install
+	./tests/run_tests.sh
